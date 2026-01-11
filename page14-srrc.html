@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Page 14 - Filtre SRRC</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a2e; color: #eee; }
+        h1 { color: #00d4ff; text-align: center; }
+        .description { background: #16213e; padding: 15px; border-radius: 8px; margin-bottom: 20px; border-left: 4px solid #00d4ff; }
+        .pipeline { display: flex; justify-content: center; gap: 10px; margin-bottom: 20px; font-family: monospace; font-size: 14px; flex-wrap: wrap; }
+        .pipeline-step { background: #006644; padding: 8px 15px; border-radius: 5px; }
+        .pipeline-step.active { background: #00d4ff; color: #000; }
+        .pipeline-arrow { color: #00d4ff; font-size: 20px; }
+        .canvas-container { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; }
+        .canvas-box { background: #16213e; padding: 15px; border-radius: 8px; text-align: center; }
+        .canvas-box h3 { margin-top: 0; color: #00d4ff; }
+        canvas { border: 2px solid #0f3460; }
+        .controls { margin-top: 10px; }
+        button { background: #0f3460; color: #fff; border: none; padding: 10px 20px; margin: 5px; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #00d4ff; color: #000; }
+        button:disabled { background: #333; cursor: not-allowed; }
+        input[type="file"] { display: none; }
+        select, input[type="number"] { background: #0f3460; color: #fff; border: none; padding: 5px 10px; border-radius: 5px; width: 70px; }
+        .info { margin-top: 10px; font-size: 12px; color: #888; }
+        .stats { background: #0f3460; padding: 10px; border-radius: 5px; margin-top: 15px; font-size: 12px; text-align: left; }
+        .detail-section { max-width: 1100px; margin: 20px auto; }
+        .srrc-diagram { font-family: monospace; font-size: 10px; background: #0a0a15; padding: 15px; border-radius: 5px; overflow-x: auto; }
+        table.info-table { border-collapse: collapse; font-size: 11px; width: 100%; margin: 10px 0; }
+        table.info-table th, table.info-table td { border: 1px solid #333; padding: 5px 8px; text-align: left; }
+        table.info-table th { background: #0f3460; }
+        .param-row { display: flex; gap: 15px; align-items: center; justify-content: center; margin: 10px 0; flex-wrap: wrap; }
+        .param-item { display: flex; align-items: center; gap: 5px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>📻 Page 14 - Filtre SRRC</h1>
+    
+    <div class="description">
+        <strong>Fonction :</strong> Mise en forme du signal par filtre SRRC (Square Root Raised Cosine).<br>
+        <strong>But :</strong> Limiter la bande passante tout en minimisant l'ISI (Interférence Inter-Symboles).<br>
+        <strong>DVB-S :</strong> Roll-off α = 0.35 standard — Bande = (1+α) × Rs<br>
+        <strong>Entrée :</strong> Symboles I/Q QPSK — <strong>Sortie :</strong> Signal bande de base filtré
+    </div>
+    
+    <div class="pipeline">
+        <span class="pipeline-step">TS</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-step">PRBS</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-step">RS</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-step">Entrelacement</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-step">Convolutif</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-step">QPSK</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-step active">SRRC</span>
+        <span class="pipeline-arrow">→</span>
+        <span class="pipeline-step" style="background:#ff6600">RF !</span>
+    </div>
+    
+    <div class="canvas-container">
+        <div class="canvas-box">
+            <h3>1. ENTRÉE - Symboles QPSK</h3>
+            <canvas id="canvasInput" width="352" height="288"></canvas>
+            <div class="controls">
+                <button onclick="document.getElementById('fileInput').click()">📁 Charger JSON</button>
+                <input type="file" id="fileInput" accept=".json" onchange="loadJSON(this.files)">
+            </div>
+            <div class="info">Symboles I/Q (sortie Page 13)</div>
+            <div id="statsInput" class="stats" style="display:none;"></div>
+        </div>
+        
+        <div class="canvas-box">
+            <h3>2. FILTRE SRRC</h3>
+            <canvas id="canvasFilter" width="352" height="288"></canvas>
+            <div class="param-row">
+                <div class="param-item">
+                    <label>α:</label>
+                    <select id="rolloff" onchange="updateFilter()">
+                        <option value="0.20">0.20</option>
+                        <option value="0.25">0.25</option>
+                        <option value="0.35" selected>0.35</option>
+                        <option value="0.50">0.50</option>
+                    </select>
+                </div>
+                <div class="param-item">
+                    <label>Span:</label>
+                    <select id="span" onchange="updateFilter()">
+                        <option value="6">6</option>
+                        <option value="8" selected>8</option>
+                        <option value="10">10</option>
+                        <option value="12">12</option>
+                    </select>
+                </div>
+                <div class="param-item">
+                    <label>SPS:</label>
+                    <select id="sps" onchange="updateFilter()">
+                        <option value="2">2</option>
+                        <option value="4" selected>4</option>
+                        <option value="8">8</option>
+                    </select>
+                </div>
+            </div>
+            <div class="controls">
+                <button id="btnFilter" onclick="applyFilter()" disabled>⚙️ Filtrer</button>
+            </div>
+            <div class="info">Réponse impulsionnelle SRRC</div>
+        </div>
+        
+        <div class="canvas-box">
+            <h3>3. SORTIE - Signal Filtré</h3>
+            <canvas id="canvasOutput" width="352" height="288"></canvas>
+            <div class="controls">
+                <button id="btnExportJSON" onclick="exportJSON()" disabled>💾 JSON</button>
+                <button id="btnExportBin" onclick="exportBinary()" disabled>💾 .bin</button>
+            </div>
+            <div class="info">Bande de base I/Q prêt pour RF</div>
+        </div>
+    </div>
+    
+    <div class="detail-section">
+        <div id="globalStats" class="stats" style="display:none; margin-top: 15px;"></div>
+        
+        <h4 style="color: #00d4ff; margin-top: 20px;">Formule SRRC</h4>
+        <div class="srrc-diagram">
+Square Root Raised Cosine - Réponse impulsionnelle h(t):
+
+Pour t = 0:
+    h(0) = (1/Ts) × (1 + α×(4/π - 1))
+
+Pour t = ±Ts/(4α):
+    h(±Ts/4α) = (α/(Ts×√2)) × [(1+2/π)×sin(π/4α) + (1-2/π)×cos(π/4α)]
+
+Pour autres t:
+    h(t) = (1/Ts) × [sin(π×t/Ts×(1-α)) + 4α×t/Ts×cos(π×t/Ts×(1+α))]
+                    ─────────────────────────────────────────────────────
+                           π×t/Ts × [1 - (4α×t/Ts)²]
+
+Paramètres:
+    α  = Roll-off (excess bandwidth) : 0 ≤ α ≤ 1
+    Ts = Période symbole = 1/Rs
+    
+Propriété clé: SRRC × SRRC = Raised Cosine (Nyquist, ISI = 0 aux instants d'échantillonnage)
+        </div>
+        
+        <h4 style="color: #00d4ff; margin-top: 20px;">Spectre et Bande Passante</h4>
+        <div class="srrc-diagram">
+             │
+          1 ─┤ ████████████████████████▓▓▓▓▓░░░░░
+             │ ████████████████████████▓▓▓▓▓░░░░░
+             │ ████████████████████████▓▓▓▓▓░░░░░
+        0.5 ─┤ ████████████████████████▓▓▓▓▓░░░░░
+             │ ████████████████████████▓▓▓▓▓░░░░░
+             │ ████████████████████████▓▓▓▓▓░░░░░
+          0 ─┼────────────────────────────────────►
+             0        (1-α)/2T    1/2T    (1+α)/2T    f
+             
+             │◄──── Bande utile ────►│◄─ Transition ─►│
+             
+Bande occupée = Rs × (1 + α)
+
+Exemple DVB-S avec Rs = 27.5 Msym/s et α = 0.35:
+    Bande = 27.5 × 1.35 = 37.125 MHz
+        </div>
+        
+        <h4 style="color: #00d4ff; margin-top: 20px;">Paramètres</h4>
+        <table class="info-table">
+            <tr><th>Paramètre</th><th>Valeur DVB-S</th><th>Description</th></tr>
+            <tr><td>Roll-off α</td><td>0.35</td><td>Excès de bande passante</td></tr>
+            <tr><td>Span</td><td>8-10 symboles</td><td>Longueur du filtre (±span/2)</td></tr>
+            <tr><td>SPS</td><td>4-8</td><td>Samples per symbol (suréchantillonnage)</td></tr>
+            <tr><td>Nyquist</td><td>ISI = 0</td><td>Après filtre RX matched</td></tr>
+        </table>
+        
+        <h4 style="color: #00d4ff; margin-top: 20px;">🎉 Pipeline DVB-S Complet !</h4>
+        <table class="info-table">
+            <tr><th>#</th><th>Étape</th><th>Entrée</th><th>Sortie</th></tr>
+            <tr><td>01-05</td><td>Compression MPEG-2</td><td>Image 352×288</td><td>Bitstream VLC</td></tr>
+            <tr><td>06</td><td>Elementary Stream</td><td>VLC</td><td>ES avec headers</td></tr>
+            <tr><td>07</td><td>PES</td><td>ES</td><td>Paquets PES + PTS</td></tr>
+            <tr><td>08</td><td>Transport Stream</td><td>PES</td><td>TS 188 oct + PAT/PMT</td></tr>
+            <tr><td>09</td><td>PRBS</td><td>TS</td><td>TS randomisé</td></tr>
+            <tr><td>10</td><td>Reed-Solomon</td><td>188 oct</td><td>204 oct (+16 parité)</td></tr>
+            <tr><td>11</td><td>Entrelacement</td><td>RS blocs</td><td>Flux entrelacé I=12</td></tr>
+            <tr><td>12</td><td>Convolutif</td><td>Bits</td><td>Bits codés (taux R)</td></tr>
+            <tr><td>13</td><td>QPSK</td><td>Dibits</td><td>Symboles I/Q</td></tr>
+            <tr><td>14</td><td>SRRC</td><td>Symboles</td><td>Signal bande de base</td></tr>
+        </table>
+    </div>
+
+    <script>
+        const WIDTH = 352, HEIGHT = 288;
+        
+        let inputData = null;
+        let symbolsI = [], symbolsQ = [];
+        let filterCoeffs = [];
+        let filteredI = [], filteredQ = [];
+        let filtered = false;
+        
+        window.onload = function() {
+            clearCanvas('canvasInput');
+            updateFilter();
+            clearCanvas('canvasOutput');
+        };
+        
+        function loadJSON(files) {
+            if (!files || files.length === 0) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    inputData = JSON.parse(e.target.result);
+                    if (!inputData.format || inputData.format !== 'DVB_QPSK_V1') {
+                        alert('Format non reconnu. Utilisez la sortie de Page 13.');
+                        return;
+                    }
+                    
+                    // Décoder I et Q depuis base64 Float32
+                    symbolsI = base64ToFloatArray(inputData.I);
+                    symbolsQ = base64ToFloatArray(inputData.Q);
+                    
+                    filteredI = [];
+                    filteredQ = [];
+                    filtered = false;
+                    
+                    displayInputSymbols();
+                    updateFilter();
+                    clearCanvas('canvasOutput');
+                    
+                    document.getElementById('btnFilter').disabled = false;
+                    document.getElementById('btnExportJSON').disabled = true;
+                    document.getElementById('btnExportBin').disabled = true;
+                    document.getElementById('globalStats').style.display = 'none';
+                    
+                    document.getElementById('statsInput').style.display = 'block';
+                    document.getElementById('statsInput').innerHTML = `
+                        <strong>Symboles chargés:</strong><br>
+                        • Symboles I/Q: ${symbolsI.length.toLocaleString()}<br>
+                        • Durée (à 1 Msym/s): ${(symbolsI.length / 1e6).toFixed(3)} s
+                    `;
+                } catch (err) { alert('Erreur: ' + err.message); }
+            };
+            reader.readAsText(files[0]);
+        }
+        
+        function base64ToFloatArray(base64) {
+            const binary = atob(base64);
+            const bytes = new Uint8Array(binary.length);
+            for (let i = 0; i < binary.length; i++) {
+                bytes[i] = binary.charCodeAt(i);
+            }
+            return Array.from(new Float32Array(bytes.buffer));
+        }
+        
+        function displayInputSymbols() {
+            const canvas = document.getElementById('canvasInput');
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            
+            ctx.font = 'bold 12px Arial';
+            ctx.fillStyle = '#00d4ff';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${symbolsI.length.toLocaleString()} symboles QPSK`, WIDTH/2, 20);
+            
+            // Constellation
+            const centerX = WIDTH / 2, centerY = 100, scale = 60;
+            
+            ctx.strokeStyle = '#333';
+            ctx.beginPath();
+            ctx.moveTo(centerX, 40);
+            ctx.lineTo(centerX, 160);
+            ctx.moveTo(centerX - 80, centerY);
+            ctx.lineTo(centerX + 80, centerY);
+            ctx.stroke();
+            
+            // Points (échantillon)
+            const step = Math.max(1, Math.floor(symbolsI.length / 500));
+            ctx.fillStyle = 'rgba(0, 255, 136, 0.3)';
+            for (let i = 0; i < symbolsI.length; i += step) {
+                const x = centerX + symbolsI[i] * scale;
+                const y = centerY - symbolsQ[i] * scale;
+                ctx.beginPath();
+                ctx.arc(x, y, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+            
+            // Signal temporel (aperçu)
+            ctx.fillStyle = '#888';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('I (premiers symboles):', 10, 185);
+            
+            ctx.strokeStyle = '#ff8800';
+            ctx.beginPath();
+            const showSym = Math.min(100, symbolsI.length);
+            for (let i = 0; i < showSym; i++) {
+                const x = 10 + i * 3;
+                const y = 220 - symbolsI[i] * 25;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            
+            ctx.fillStyle = '#888';
+            ctx.fillText('Signal "carré" → besoin filtrage', 10, HEIGHT - 10);
+        }
+        
+        // Génération des coefficients SRRC
+        function generateSRRC(alpha, span, sps) {
+            const numTaps = span * sps + 1;
+            const coeffs = new Array(numTaps);
+            const Ts = sps; // Ts en samples
+            
+            for (let i = 0; i < numTaps; i++) {
+                const t = (i - numTaps / 2) / sps; // t en périodes symbole
+                coeffs[i] = srrcSample(t, alpha);
+            }
+            
+            // Normaliser pour énergie unitaire
+            let energy = 0;
+            for (const c of coeffs) energy += c * c;
+            const norm = Math.sqrt(energy);
+            for (let i = 0; i < numTaps; i++) coeffs[i] /= norm;
+            
+            return coeffs;
+        }
+        
+        function srrcSample(t, alpha) {
+            const eps = 1e-8;
+            
+            if (Math.abs(t) < eps) {
+                // t = 0
+                return 1 - alpha + 4 * alpha / Math.PI;
+            }
+            
+            if (Math.abs(Math.abs(t) - 1 / (4 * alpha)) < eps) {
+                // t = ±1/(4α)
+                const term1 = (1 + 2 / Math.PI) * Math.sin(Math.PI / (4 * alpha));
+                const term2 = (1 - 2 / Math.PI) * Math.cos(Math.PI / (4 * alpha));
+                return alpha / Math.sqrt(2) * (term1 + term2);
+            }
+            
+            // Cas général
+            const pit = Math.PI * t;
+            const num = Math.sin(pit * (1 - alpha)) + 4 * alpha * t * Math.cos(pit * (1 + alpha));
+            const den = pit * (1 - Math.pow(4 * alpha * t, 2));
+            
+            if (Math.abs(den) < eps) return 0;
+            return num / den;
+        }
+        
+        function updateFilter() {
+            const alpha = parseFloat(document.getElementById('rolloff').value);
+            const span = parseInt(document.getElementById('span').value);
+            const sps = parseInt(document.getElementById('sps').value);
+            
+            filterCoeffs = generateSRRC(alpha, span, sps);
+            drawFilter(alpha, span, sps);
+        }
+        
+        function drawFilter(alpha, span, sps) {
+            const canvas = document.getElementById('canvasFilter');
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            
+            ctx.font = 'bold 12px Arial';
+            ctx.fillStyle = '#00d4ff';
+            ctx.textAlign = 'center';
+            ctx.fillText(`SRRC α=${alpha}, span=${span}, sps=${sps}`, WIDTH/2, 20);
+            ctx.font = '10px Arial';
+            ctx.fillText(`${filterCoeffs.length} coefficients`, WIDTH/2, 35);
+            
+            // Tracer la réponse impulsionnelle
+            const startY = 140;
+            const scaleY = 80;
+            const scaleX = (WIDTH - 40) / filterCoeffs.length;
+            
+            // Axe
+            ctx.strokeStyle = '#444';
+            ctx.beginPath();
+            ctx.moveTo(20, startY);
+            ctx.lineTo(WIDTH - 20, startY);
+            ctx.stroke();
+            
+            // Courbe
+            ctx.strokeStyle = '#00ff88';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            let maxVal = 0;
+            for (const c of filterCoeffs) maxVal = Math.max(maxVal, Math.abs(c));
+            
+            for (let i = 0; i < filterCoeffs.length; i++) {
+                const x = 20 + i * scaleX;
+                const y = startY - (filterCoeffs[i] / maxVal) * scaleY;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            ctx.stroke();
+            ctx.lineWidth = 1;
+            
+            // Marquer les instants symbole
+            ctx.fillStyle = '#ff8800';
+            for (let s = 0; s <= span; s++) {
+                const i = s * sps;
+                if (i < filterCoeffs.length) {
+                    const x = 20 + i * scaleX;
+                    ctx.beginPath();
+                    ctx.arc(x, startY, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            }
+            
+            // Labels
+            ctx.fillStyle = '#888';
+            ctx.font = '9px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('0', 20, startY + 15);
+            ctx.fillText(`${span}T`, WIDTH - 20, startY + 15);
+            ctx.fillText('● = instant symbole', WIDTH/2, startY + 30);
+            
+            // Spectre simplifié
+            ctx.fillStyle = '#fff';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('Spectre (forme):', 10, 200);
+            
+            // Dessiner forme spectrale RC
+            ctx.fillStyle = 'rgba(0, 170, 255, 0.5)';
+            ctx.beginPath();
+            ctx.moveTo(50, 270);
+            
+            for (let f = 0; f <= 1.5; f += 0.01) {
+                const x = 50 + f * 180;
+                let h;
+                if (f <= (1 - alpha) / 2) {
+                    h = 1;
+                } else if (f <= (1 + alpha) / 2) {
+                    h = 0.5 * (1 + Math.cos(Math.PI / alpha * (f - (1 - alpha) / 2)));
+                } else {
+                    h = 0;
+                }
+                const y = 270 - Math.sqrt(h) * 50; // sqrt car SRRC
+                ctx.lineTo(x, y);
+            }
+            ctx.lineTo(50 + 1.5 * 180, 270);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.strokeStyle = '#888';
+            ctx.beginPath();
+            ctx.moveTo(50, 270);
+            ctx.lineTo(50 + 1.5 * 180, 270);
+            ctx.stroke();
+            
+            ctx.fillStyle = '#888';
+            ctx.font = '8px Arial';
+            ctx.fillText('0', 48, 280);
+            ctx.fillText('Rs/2', 50 + 0.5 * 180 - 10, 280);
+            ctx.fillText('Rs(1+α)/2', 50 + (1 + alpha) / 2 * 180 - 20, 280);
+        }
+        
+        function applyFilter() {
+            if (!symbolsI.length) return;
+            
+            const sps = parseInt(document.getElementById('sps').value);
+            
+            // Suréchantillonner (zero-stuffing)
+            const upsampledI = new Array(symbolsI.length * sps).fill(0);
+            const upsampledQ = new Array(symbolsQ.length * sps).fill(0);
+            
+            for (let i = 0; i < symbolsI.length; i++) {
+                upsampledI[i * sps] = symbolsI[i];
+                upsampledQ[i * sps] = symbolsQ[i];
+            }
+            
+            // Convolution avec le filtre SRRC
+            filteredI = convolve(upsampledI, filterCoeffs);
+            filteredQ = convolve(upsampledQ, filterCoeffs);
+            
+            filtered = true;
+            displayOutput();
+            
+            document.getElementById('btnExportJSON').disabled = false;
+            document.getElementById('btnExportBin').disabled = false;
+            
+            const alpha = parseFloat(document.getElementById('rolloff').value);
+            
+            document.getElementById('globalStats').style.display = 'block';
+            document.getElementById('globalStats').innerHTML = `
+                <strong>Filtrage terminé:</strong><br>
+                • Symboles entrée: ${symbolsI.length.toLocaleString()}<br>
+                • Samples sortie: ${filteredI.length.toLocaleString()} (×${sps} suréchantillonnage)<br>
+                • Filtre: ${filterCoeffs.length} taps<br>
+                • Bande relative: ${(1 + alpha).toFixed(2)} × Rs<br><br>
+                <strong style="color:#00ff88">🎉 PIPELINE DVB-S COMPLET !</strong><br>
+                Image → MPEG-2 → TS → PRBS → RS → Interleave → FEC → QPSK → SRRC → 📡
+            `;
+        }
+        
+        function convolve(signal, kernel) {
+            const result = new Array(signal.length + kernel.length - 1).fill(0);
+            
+            for (let i = 0; i < signal.length; i++) {
+                if (signal[i] === 0) continue; // Optimisation zero-stuffing
+                for (let j = 0; j < kernel.length; j++) {
+                    result[i + j] += signal[i] * kernel[j];
+                }
+            }
+            
+            // Tronquer pour garder la même longueur
+            const offset = Math.floor(kernel.length / 2);
+            return result.slice(offset, offset + signal.length);
+        }
+        
+        function displayOutput() {
+            const canvas = document.getElementById('canvasOutput');
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+            
+            ctx.font = 'bold 12px Arial';
+            ctx.fillStyle = '#00d4ff';
+            ctx.textAlign = 'center';
+            ctx.fillText(`${filteredI.length.toLocaleString()} samples I/Q filtrés`, WIDTH/2, 20);
+            
+            // Signaux I et Q
+            const startY_I = 80, startY_Q = 180;
+            const sigH = 45;
+            
+            ctx.fillStyle = '#ff8800';
+            ctx.font = '10px Arial';
+            ctx.textAlign = 'left';
+            ctx.fillText('I filtré:', 10, startY_I - sigH - 5);
+            ctx.fillStyle = '#00aaff';
+            ctx.fillText('Q filtré:', 10, startY_Q - sigH - 5);
+            
+            // Trouver max pour normaliser
+            let maxVal = 0;
+            for (let i = 0; i < Math.min(1000, filteredI.length); i++) {
+                maxVal = Math.max(maxVal, Math.abs(filteredI[i]), Math.abs(filteredQ[i]));
+            }
+            if (maxVal === 0) maxVal = 1;
+            
+            // Axes
+            ctx.strokeStyle = '#444';
+            ctx.beginPath();
+            ctx.moveTo(10, startY_I);
+            ctx.lineTo(WIDTH - 10, startY_I);
+            ctx.moveTo(10, startY_Q);
+            ctx.lineTo(WIDTH - 10, startY_Q);
+            ctx.stroke();
+            
+            const showSamples = Math.min(filteredI.length, (WIDTH - 20) * 2);
+            const step = showSamples / (WIDTH - 20);
+            
+            // I
+            ctx.strokeStyle = '#ff8800';
+            ctx.beginPath();
+            for (let x = 0; x < WIDTH - 20; x++) {
+                const i = Math.floor(x * step);
+                const y = startY_I - (filteredI[i] / maxVal) * sigH;
+                if (x === 0) ctx.moveTo(10 + x, y);
+                else ctx.lineTo(10 + x, y);
+            }
+            ctx.stroke();
+            
+            // Q
+            ctx.strokeStyle = '#00aaff';
+            ctx.beginPath();
+            for (let x = 0; x < WIDTH - 20; x++) {
+                const i = Math.floor(x * step);
+                const y = startY_Q - (filteredQ[i] / maxVal) * sigH;
+                if (x === 0) ctx.moveTo(10 + x, y);
+                else ctx.lineTo(10 + x, y);
+            }
+            ctx.stroke();
+            
+            // Eye diagram mini
+            ctx.fillStyle = '#888';
+            ctx.font = '9px Arial';
+            ctx.fillText('Signal lissé, prêt pour modulation RF', 10, HEIGHT - 10);
+            
+            // Indicateur "complet"
+            ctx.fillStyle = '#00ff88';
+            ctx.font = 'bold 14px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText('✓ Bande de base prête !', WIDTH/2, HEIGHT - 25);
+        }
+        
+        function exportJSON() {
+            if (!filtered) return;
+            
+            const alpha = parseFloat(document.getElementById('rolloff').value);
+            const span = parseInt(document.getElementById('span').value);
+            const sps = parseInt(document.getElementById('sps').value);
+            
+            const output = {
+                format: 'DVB_BASEBAND_V1',
+                description: 'DVB-S Baseband Signal (SRRC filtered)',
+                date: new Date().toISOString(),
+                source: inputData.format,
+                image: inputData.image,
+                srrc: {
+                    rolloff: alpha,
+                    span: span,
+                    samplesPerSymbol: sps,
+                    filterTaps: filterCoeffs.length,
+                    symbolCount: symbolsI.length,
+                    sampleCount: filteredI.length
+                },
+                qpsk: inputData.qpsk,
+                I: floatArrayToBase64(new Float32Array(filteredI)),
+                Q: floatArrayToBase64(new Float32Array(filteredQ))
+            };
+            
+            const blob = new Blob([JSON.stringify(output, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'dvbs_baseband.json';
+            a.click();
+        }
+        
+        function exportBinary() {
+            if (!filtered) return;
+            
+            // I/Q entrelacés Float32
+            const buffer = new Float32Array(filteredI.length * 2);
+            for (let i = 0; i < filteredI.length; i++) {
+                buffer[i * 2] = filteredI[i];
+                buffer[i * 2 + 1] = filteredQ[i];
+            }
+            
+            const blob = new Blob([buffer], { type: 'application/octet-stream' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = 'dvbs_baseband_iq.bin';
+            a.click();
+        }
+        
+        function floatArrayToBase64(floatArray) {
+            const bytes = new Uint8Array(floatArray.buffer);
+            let binary = '';
+            for (let i = 0; i < bytes.length; i++) {
+                binary += String.fromCharCode(bytes[i]);
+            }
+            return btoa(binary);
+        }
+        
+        function clearCanvas(id) {
+            const ctx = document.getElementById(id).getContext('2d');
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, WIDTH, HEIGHT);
+        }
+    </script>
+</body>
+</html>
