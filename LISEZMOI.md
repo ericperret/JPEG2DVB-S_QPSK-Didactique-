@@ -1,49 +1,52 @@
-# 🎯 One-Page-One-Mission (Khéops)
-
 [![License: CC BY-NC 4.0](https://img.shields.io/badge/License-CC%20BY--NC%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by-nc/4.0/)
 [![Pure HTML/JS](https://img.shields.io/badge/Pure-HTML%2FJS-blue.svg)](#)
-[![No Dependencies](https://img.shields.io/badge/Dependencies-None-green.svg)](#)
+[![Educational](https://img.shields.io/badge/Purpose-Educational-orange.svg)](#)
 
-**Simulateur de détection acoustique de drone** avec localisation 3D temps réel et conduite de tir.
+**Tutoriel interactif sur la chaîne de transmission DVB-S** — De l'image JPEG à la modulation QPSK.
 
 ![Screenshot](screenshot.png)
 
 ## 🚀 Fonctionnalités
 
-- **Multilatération TDOA** — Algorithme de Chan pour estimation de position 3D
-- **Filtre de Kalman** — Fusion 6 états (position + vitesse)
-- **RANSAC** — Rejet des mesures aberrantes
-- **ISO 9613-1** — Calcul précis de la vitesse du son (température, humidité, pression, CO₂)
-- **Intégration Doppler** — Estimation de vitesse radiale avec zone morte
-- **Simulation de vent** — Modèle de perturbation atmosphérique réaliste
-- **Conduite de tir** — Handover automatique acoustique → optique
-- **Visualisation temps réel** — Carte Leaflet, vue latérale, caméra, viseur
+Visualisation étape par étape de la chaîne de transmission DVB-S complète :
+
+1. **Capture Caméra** — Acquisition de l'image source
+2. **Macroblocs** — Découpage en blocs 8x8
+3. **DCT** — Transformée en Cosinus Discrète
+4. **Quantification** — Compression avec pertes
+5. **Scan Zigzag** — Réordonnancement des coefficients
+6. **RLE + Huffman** — Codage entropique
+7. **Elementary Stream** — Empaquetage ES vidéo
+8. **PES** — Packetized Elementary Stream
+9. **Transport Stream** — Multiplexage MPEG-TS
+10. **PRBS** — Dispersion d'énergie
+11. **Reed-Solomon** — Codage externe FEC (204,188)
+12. **Entrelacement** — Protection contre les erreurs en rafale
+13. **Code Convolutif** — Codage interne FEC
+14. **QPSK** — Modulation en quadrature
+15. **Filtre SRRC** — Mise en forme des impulsions
 
 ## 🛠️ Technologies
 
 - HTML/CSS/JavaScript pur
-- Aucune dépendance externe (sauf Leaflet pour les tuiles de carte)
-- Fonctionne entièrement dans le navigateur
-- Fichier unique, ~3000 lignes
+- Aucune dépendance externe
+- Chaque étape est une page HTML autonome
+- Calculs réels, pas juste des schémas
 
 ## 📖 Utilisation
 
-1. Ouvrir \`index.html\` dans un navigateur
-2. Cliquer sur **START** pour lancer la simulation
-3. Ajuster les paramètres dans la barre latérale (vent, vitesse drone, température...)
-4. Observer le système acoustique traquer le drone et transférer à la conduite de tir optique
+Ouvrir n'importe quel fichier \`pageXX-*.html\` dans un navigateur pour explorer cette étape.
 
 ## 🎓 But pédagogique
 
-Ce simulateur démontre :
-- Les techniques de localisation acoustique passive
-- La fusion de capteurs avec filtrage de Kalman
-- Les concepts anti-drone (Counter-UAS)
-- Le traitement du signal temps réel en JavaScript
+Comprendre comment fonctionne la TV satellite numérique, de la compression vidéo à la modulation RF. Chaque page inclut :
+- Explication théorique
+- Visualisation interactive
+- Calculs temps réel
 
 ## 📄 Licence
 
-CC BY-NC 4.0 — Usage non commercial uniquement.
+CC BY-NC 4.0
 
 ## 👤 Auteur
 
